@@ -8,6 +8,9 @@ import (
 	"log"
 	"strings"
 	"regexp"
+	"os"
+	"encoding/json"
+	"io/ioutil"
 )
 
 //struct to hold what can de configurable in this proxy
@@ -37,6 +40,17 @@ type RegexRouterRule struct {
 
 func (r RegexRouterRule) matches(req *http.Request) bool {
 	return r.regex.MatchString(req.URL.Path)
+}
+
+type settings struct {
+	Port string `json:port`
+	Routers []RouterConf `json:routers`
+}
+
+type RouterConf struct {
+	TargetUrl string `json:targetUrl`
+	Scheme string `json:scheme`
+	PathPattern string `json:pathPattern`
 }
 
 //just copied from reverseproxy.go
@@ -80,20 +94,61 @@ func NewMultiHostReverseProxy(targets []*ProxyConf) *httputil.ReverseProxy {
 	return &httputil.ReverseProxy{Director: director}
 }
 
+var (
+	port *string
+	targets []*ProxyConf
+)
+
+func loadSettings(){
+	file, e := ioutil.ReadFile("./config.json")
+	if e != nil {
+		fmt.Printf("could not read configuraton file. Error: %v\n", e)
+		os.Exit(1)
+	}
+
+	var rawSettings settings
+	err := json.Unmarshal(file, &rawSettings)
+	if err != nil {
+		fmt.Println("Could not parse configuration file. ", err)
+		os.Exit(1)
+	}
+	fmt.Println(rawSettings)
+	fmt.Println("Starting app using port ", rawSettings.Port)
+	port = &rawSettings.Port
+
+	for i:=0; i<len(rawSettings.Routers);i++ {
+
+		if rawSettings.Routers[i].PathPattern != "" {
+			targets = append(targets, &ProxyConf{
+				rule:RegexRouterRule{regex: *regexp.MustCompile(rawSettings.Routers[i].PathPattern)},
+				target: &url.URL{Scheme:rawSettings.Routers[i].Scheme,
+					Host:rawSettings.Routers[i].TargetUrl},
+			})
+		} else {
+			targets = append(targets, &ProxyConf{
+				rule:DefaultRouterRule{},
+				target: &url.URL{Scheme:rawSettings.Routers[i].Scheme, Host:rawSettings.Routers[i].TargetUrl},
+			},)
+		}
+	}
+
+}
+
 func main() {
 
 	//TODO read conf from external file
-	proxy := NewMultiHostReverseProxy([]*ProxyConf{
-		&ProxyConf{
-			rule:RegexRouterRule{regex: *regexp.MustCompile("/accounts/tl*")},
-			target: &url.URL{Scheme:"http", Host:"localhost:8001"},
-		},
-		&ProxyConf{
-			rule:DefaultRouterRule{},
-			target: &url.URL{Scheme:"http", Host:"localhost:8000"},
-		},
-	})
-
-	fmt.Println("Starting server on port 9090")
-	log.Fatal(http.ListenAndServe(":9090", proxy))
+//	proxy := NewMultiHostReverseProxy([]*ProxyConf{
+//		&ProxyConf{
+//			rule:RegexRouterRule{regex: *regexp.MustCompile("/accounts/tl*")},
+//			target: &url.URL{Scheme:"http", Host:"localhost:8001"},
+//		},
+//		&ProxyConf{
+//			rule:DefaultRouterRule{},
+//			target: &url.URL{Scheme:"http", Host:"localhost:8000"},
+//		},
+//	})
+	loadSettings()
+	proxy := NewMultiHostReverseProxy(targets)
+	//fmt.Println("Starting server on port 9090")
+	log.Fatal(http.ListenAndServe(":" + *port, proxy))
 }
