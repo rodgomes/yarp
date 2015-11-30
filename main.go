@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	"github.com/rodgomes/yarp/config"
 	"os"
+	"github.com/rodgomes/yarp/config"
 )
 
 //just copied from reverseproxy.go
