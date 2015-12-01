@@ -4,7 +4,7 @@
     {
       "targetUrl": "localhost:8001",
       "scheme": "http",
-      "pathPattern": "/accounts/tl/.*?"
+      "pathPattern": "/some/path/.*?"
     },
     {
       "targetUrl": "localhost:8000",

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"encoding/json"
 	"io/ioutil"
+	"errors"
 )
 
 //struct to hold what can de configurable in this proxy
@@ -76,10 +77,10 @@ type RouterConf struct {
 	PathPattern string `json:pathPattern`
 }
 
-func LoadSettings() (*string, [] *ProxyConf, error){
+func LoadSettings(cfgPath *string) (*string, [] *ProxyConf, error){
 	var targets[] *ProxyConf
 	var port *string
-	file, err := ioutil.ReadFile("./config.json")
+	file, err := ioutil.ReadFile(*cfgPath)
 	if err != nil {
 		fmt.Printf("could not read configuraton file. Error: %v\n", err)
 		return port, targets, err
@@ -96,6 +97,10 @@ func LoadSettings() (*string, [] *ProxyConf, error){
 
 	for i:=0; i<len(rawSettings.Routers);i++ {
 		targets = append(targets, NewProxyConf(&rawSettings.Routers[i]))
+	}
+
+	if len(targets) == 0 {
+		return port, targets, errors.New("At least one target should be provided")
 	}
 
 	return port, targets, nil
